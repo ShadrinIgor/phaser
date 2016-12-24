@@ -3,14 +3,19 @@ var game = new Phaser.Game(800, 600, Phaser.AUTO, '#game', { preload: preload, c
 var platforms;
 var player;
 var stars;
+var gun;
 var score = 0;
 var scoreText;
+var gunStatus = 0;
+var nap = -1;
 
 function preload() {
     game.load.image('ground', 'phaser-pong/assets/ground.jpg');
     game.load.image('star', 'phaser-pong/assets/star.png');
     game.load.image('background', 'phaser-pong/assets/sky.jpg');
     game.load.spritesheet('dude', 'phaser-pong/assets/dude.png', 32, 48);
+    game.load.spritesheet('gun', 'phaser-pong/assets/gun.png', 21, 20);
+    game.load.spritesheet('explosion', 'phaser-pong/assets/explosion.png', 20, 20);
 }
 function create() {
     game.physics.startSystem(Phaser.Physics.ARCADE);
@@ -64,6 +69,9 @@ function create() {
     player.animations.add('left', [0, 1, 2, 3], 10, true);
     player.animations.add('right', [5, 6, 7, 8], 10, true);
 
+    guns = game.add.group();
+    guns.setAll('body.allowGravity', false);
+
     cursors = game.input.keyboard.createCursorKeys();
 
     scoreText = game.add.text(16, 16, 'score: 0', { fontSize: '32px', fill: '#000' });
@@ -74,6 +82,7 @@ function update () {
     game.physics.arcade.collide(player, platforms);
     game.physics.arcade.collide(stars, platforms);
     game.physics.arcade.overlap(player, stars, collectStar, null, this);
+    game.physics.arcade.overlap(guns, stars, collectStar, null, this);
 
     //  Обнулим скорость перемещения персонажа в пространстве
     player.body.velocity.x = 0;
@@ -84,6 +93,7 @@ function update () {
         player.body.velocity.x = -150;
 
         player.animations.play('left');
+        nap = 1;
     }
     else if (cursors.right.isDown)
     {
@@ -91,13 +101,15 @@ function update () {
         player.body.velocity.x = 150;
 
         player.animations.play('right');
+        nap = -1;
     }
     else
     {
+        //nap = -1;
         //  Состояние покоя
         player.animations.stop();
 
-        player.frame = 4;
+        //player.frame = 5;
     }
 
     //  Высота прыжка
@@ -106,11 +118,42 @@ function update () {
         player.body.velocity.y = -350;
     }
 
-    function collectStar (player, star) {
-
-        // Removes the star from the screen
-        star.kill();
-        score += 10;
-        scoreText.text = 'Score: ' + score
+    if (cursors.down.isDown) {
+        fire();
     }
+
+    if (cursors.down.isUp) {
+        gunStatus = 0;
+    }
+}
+
+function fire() {
+    if( gunStatus == 0 ){
+
+        var p = new Phaser.Point(this.player.x+5, this.player.y+25);
+
+        var item = guns.create(p.x, p.y, 'gun');
+        item.anchor.setTo(0.5, 0.5);
+        game.physics.arcade.enable(item);
+        item.animations.add('run', [0, 1, 2, 3], 10, true);
+        item.animations.play('run');
+
+        if( nap == 1 )item.body.velocity.x = -350;
+            else item.body.velocity.x = 350;
+        gunStatus = 1;
+    }
+}
+
+function collectStar (player, star) {
+
+    var explosion = game.add.sprite( star.x, star.y, "explosion" );
+    explosion.animations.add('run', [0, 1, 2, 3], 5, false);
+    game.physics.arcade.enable(explosion);
+    explosion.animations.play('run');
+    explosion.animations.currentAnim.onComplete.add(function () {	explosion.kill()}, this);
+
+    // Removes the star from the screen
+    star.kill();
+    score += 10;
+    scoreText.text = 'Score: ' + score
 }
